@@ -22,7 +22,7 @@ devices use a different protocol. It might be possible that the Powerstation
 may supplied with a firmware upgrade (using the new maxSMART 2.0 app?) that makes
 it compatible with MaxSMART 2.0 - but incompatible with the protocol described here.*
 
-Immediately after the Powerstation receives an IP address, the devices contacts
+Immediately after the Powerstation receives an IP address, the device contacts
 a server of the manufacturer.
 
 It performs a DNS-lookup of www.maxsmart.ch. It then sends a datagram to the
@@ -37,21 +37,25 @@ resolved IP:
 | Destination Port | 5000 |
 | Payload          | See payload   |
 
-Payload:
+Request payload:
 ```
 50SWP1234000000000{"cpuid":"AABBCCDDEEFF554433221100","sak":"0011AABBCCDD"}
 ```
 
 The server responds with two UDP datagrams to the source port 8888.
 
-The first datagram (prefix `50`) contains the current date and time and the 'latest' firmware version available:
+The first datagram (prefix `50`) contains the current date and time and the 'latest' firmware version available.
+
+Response payload:
 ```
 50SWP1234000000000{"register":0,"url":"www.maxsmart.ch","port":5000,"time":"2018-10-12,23:15:12","nver":"1.30"}
 ```
 
 The time field is used to configure the real time clock of the Powerstation. This is important for all time based operations (like rules).
 
-The second datagram (prefix `51`) contains a link to a firmware image:
+The second datagram (prefix `51`) contains a link to a firmware image.
+
+Response payload:
 ```
 51SWP1234000000000{"ver":"1.24","url":"http://www.maxsmart.ch/cloud/downloads/b87bd84a-a11f-42f6-8d2c-933a15d09a4e.bin","checksum":6676180}
 ```
@@ -66,16 +70,21 @@ If there is no cloud account setup in the MH app, the device does not communicat
 with the internet after the initial exchange. If the user enters MH cloud
 account credentials within the MH app, the device is immediately added to the cloud account and the device is reported as registered:
 
+Response payload (device added to cloud account):
 ```
 50SWP1234000000000{"register":1,"url":"www.maxsmart.ch","port":5000,"time":"2018-10-13,00:31:04","nver":"1.30"}
 ```
 **After that, it heavily exchanges unencrypted and unsigned UDP messages with the server of the manufacturer which allows complete control of the device from within the internet. Everything that can locally be done using the HTTP interface, can also be done remotely without *ANY* authentication using simple UDP datagram.**
 
-It is a matter of simply spoofing DNS responses in order to get complete control of devices from the MaxSmart 1.0 range. I suspect it is also possible to brick the device by providing corrupt firmware updates.
+It is a matter of simply spoofing DNS responses in order to get complete control of devices from the MaxSmart 1.0 product range. I suspect it is also possible to brick the device by providing corrupt firmware updates.
+
+Because of that, I recommend *not* to add MaxSmart 1.0 devices to an account on https://www.maxsmart.ch/cloud-login.html
 
 # Protocol
-## Discovery Protocol
-The MaxSMART devices support a proprietary discovery protocol based on UDP.
+## Discovery Protocol and configuring clock
+The MaxSMART devices support a proprietary discovery protocol based on UDP. Additionally,
+the discovery mechanism is used to set the reference time for the real time clock (RTC)
+of the power station.
 
 ### Request
 
@@ -97,7 +106,13 @@ The payload is a string consisting of two fields:
 ```
 00dv=all,2018-10-07,10:48:42,13;
 ```
-The 00dv might be some sort of device selector. The purpose of the date/time field is unclear. It seems to be optional. At least the Powerstation responds, even if the field is missing completely:
+The purpose of `00dv` is unclear. It might be some sort of device selector.
+
+The second field contains the reference time. The Powerstation uses it to set its
+real time clock (RTC).
+
+If device discovery is desired without reconfiguration of the RTC, the field may be
+omitted:
 ```
 00dv=all;
 ```
